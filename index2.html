@@ -1,0 +1,977 @@
+<!DOCTYPE html>
+<html lang="fr" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    
+    <!-- SEO & METADATA -->
+    <meta name="description" content="Tiflow Barber - Salon de coiffure homme premium à Paris.">
+    <meta name="theme-color" content="#0f172a">
+    <title>Tiflow Barber | Réservation</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Config Theme -->
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        barber: {
+                            dark: '#0f172a',    /* Bleu Nuit Profond */
+                            card: '#1e293b',    /* Carte Bleu Gris */
+                            gold: '#d4af37',    /* Or Luxe */
+                            goldLight: '#f3e5ab',
+                            white: '#f8fafc',
+                            gray: '#94a3b8',
+                            navy: '#1e3a8a'
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Montserrat', 'sans-serif'],
+                        serif: ['Playfair Display', 'serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Fonts & Icons -->
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    
+    <!-- Firebase & EmailJS -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
+
+    <style>
+        body { -webkit-tap-highlight-color: transparent; }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        
+        /* Hero Background */
+        .hero-section {
+            background-image: url('salon.jpg'); 
+            background-size: cover;
+            background-position: center;
+            height: 320px;
+            position: relative;
+        }
+        .hero-gradient {
+            background: linear-gradient(to bottom, rgba(15,23,42,0.2) 0%, rgba(15,23,42,1) 95%);
+            position: absolute; inset: 0;
+        }
+
+        /* Glassmorphism */
+        .glass {
+            background: rgba(30, 41, 59, 0.9);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        .light-mode .glass {
+            background: rgba(255, 255, 255, 0.95);
+            border: 1px solid rgba(0,0,0,0.05);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+        }
+        
+        /* Mode Clair */
+        .light-mode body {
+            background-color: #f0f4f8;
+            color: #0f172a;
+        }
+        .light-mode .hero-gradient {
+            background: linear-gradient(to bottom, rgba(255,255,255,0.1) 0%, #f0f4f8 100%);
+        }
+        
+        /* Custom Checkbox for Services */
+        .service-checkbox:checked + div {
+            border-color: #d4af37;
+            background-color: rgba(212, 175, 55, 0.15);
+            box-shadow: 0 0 15px rgba(212, 175, 55, 0.1);
+        }
+        .light-mode .service-checkbox:checked + div {
+            background-color: #fff9e6;
+        }
+        .service-checkbox:checked + div .check-icon { opacity: 1; transform: scale(1); }
+        
+        /* Selection states */
+        .selected-item {
+            border-color: #d4af37 !important;
+            background-color: rgba(212, 175, 55, 0.2) !important;
+            color: white !important;
+        }
+        .light-mode .selected-item {
+            background-color: rgba(212, 175, 55, 0.2) !important;
+            color: #0f172a !important;
+        }
+
+        .map-container iframe {
+            width: 100%; height: 100%; border-radius: 0.75rem;
+            filter: grayscale(100%) invert(92%) contrast(83%);
+        }
+        .light-mode .map-container iframe { filter: none; }
+
+        /* Styles pour l'impression (Ticket Z PRO) */
+        @media print {
+            @page { margin: 0; size: auto; }
+            body * { visibility: hidden; }
+            #receipt-print-area, #receipt-print-area * { visibility: visible; }
+            #receipt-print-area {
+                position: absolute; left: 0; top: 0; width: 80mm; 
+                background: white; color: black; padding: 5mm;
+                font-family: 'Courier New', Courier, monospace;
+                font-size: 12px;
+                line-height: 1.2;
+            }
+            button { display: none !important; }
+            .ticket-header { text-align: center; margin-bottom: 10px; }
+            .ticket-title { font-size: 16px; font-weight: bold; text-transform: uppercase; margin: 0; }
+            .ticket-subtitle { font-size: 10px; margin: 2px 0; }
+            .ticket-divider { border-bottom: 1px dashed #000; margin: 5px 0; }
+            .ticket-row { display: flex; justify-content: space-between; margin-bottom: 2px; }
+            .ticket-total-row { font-weight: bold; font-size: 14px; margin-top: 5px; border-top: 1px dashed #000; padding-top: 5px; }
+            .ticket-footer { text-align: center; margin-top: 15px; font-size: 10px; }
+        }
+    </style>
+</head>
+<body class="bg-barber-dark text-barber-white font-sans antialiased min-h-screen pb-32 transition-colors duration-300">
+
+    <!-- NAVIGATION -->
+    <nav class="fixed top-0 w-full z-50 glass border-b border-white/5 transition-all duration-300 shadow-lg" id="navbar">
+        <div class="max-w-3xl mx-auto px-4 h-16 flex items-center justify-between">
+            <div class="flex items-center gap-3 cursor-pointer" onclick="location.reload()">
+                <div class="relative">
+                    <img src="logo.JPG" class="h-10 w-10 rounded-full border-2 border-barber-gold object-cover shadow-glow">
+                    <div class="absolute bottom-0 right-0 h-3 w-3 bg-green-500 border-2 border-barber-dark rounded-full"></div>
+                </div>
+                <h1 class="font-serif text-lg font-bold tracking-widest text-white dark:text-white text-barber-dark">TIFLOW <span class="text-barber-gold">BARBER</span></h1>
+            </div>
+            <div class="flex items-center gap-3">
+                <button onclick="toggleTheme()" class="h-9 w-9 rounded-full bg-white/10 flex items-center justify-center text-barber-gold hover:bg-white/20 transition-all border border-white/10 shadow-sm">
+                    <i class="fas fa-sun block dark:hidden"></i>
+                    <i class="fas fa-moon hidden dark:block"></i>
+                </button>
+                <button onclick="toggleAdminPanel()" class="text-xs font-bold text-barber-dark bg-barber-gold px-4 py-1.5 rounded-full hover:bg-white transition-all shadow-glow">
+                    PRO
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- CONTAINER PRINCIPAL -->
+    <main class="max-w-3xl mx-auto relative">
+        
+        <!-- VUE CLIENT -->
+        <div id="view-client">
+            
+            <!-- HERO SECTION -->
+            <div class="hero-section">
+                <div class="hero-gradient"></div>
+                <div class="absolute bottom-0 left-0 w-full p-6">
+                    <div class="flex justify-between items-end">
+                        <div>
+                            <div class="flex items-center gap-1 text-barber-gold text-sm mb-2">
+                                <i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i>
+                                <span class="text-gray-300 text-xs ml-1 font-medium">5.0 (142 avis)</span>
+                            </div>
+                            <h2 class="text-4xl font-serif font-bold text-white mb-2 shadow-black drop-shadow-md">Tiflow Barber</h2>
+                            <p class="text-gray-300 text-sm flex items-center gap-2">
+                                <i class="fas fa-map-pin text-barber-gold"></i> 26 Rue de Gramont, 75002 Paris
+                            </p>
+                        </div>
+                        <div class="hidden sm:block">
+                            <span class="inline-flex items-center gap-1.5 px-3 py-1 bg-green-500/20 text-green-400 text-xs font-bold rounded-full border border-green-500/20 backdrop-blur-md">OUVERT</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ONGLETS -->
+            <div class="sticky top-16 z-40 bg-barber-dark/95 dark:bg-barber-dark/95 bg-white/95 backdrop-blur-md border-b border-gray-200 dark:border-white/5 py-3 overflow-x-auto no-scrollbar pl-4 shadow-lg transition-colors duration-300">
+                <div class="flex gap-3 min-w-max pr-4">
+                    <button onclick="scrollToCategory('coiffure')" class="tab-item px-5 py-2 rounded-full bg-barber-gold text-barber-dark text-xs font-bold shadow-glow">COIFFURE</button>
+                    <button onclick="scrollToCategory('barbe')" class="tab-item px-5 py-2 rounded-full bg-white/5 text-gray-500 dark:text-gray-300 text-xs font-bold border border-transparent hover:text-barber-gold hover:bg-white/10 transition-colors">BARBE</button>
+                    <button onclick="scrollToCategory('forfaits')" class="tab-item px-5 py-2 rounded-full bg-white/5 text-gray-500 dark:text-gray-300 text-xs font-bold border border-transparent hover:text-barber-gold hover:bg-white/10 transition-colors">FORFAITS</button>
+                    <button onclick="scrollToCategory('soins')" class="tab-item px-5 py-2 rounded-full bg-white/5 text-gray-500 dark:text-gray-300 text-xs font-bold border border-transparent hover:text-barber-gold hover:bg-white/10 transition-colors">SOINS</button>
+                </div>
+            </div>
+
+            <!-- LISTE PRESTATIONS -->
+            <div class="px-4 py-8 space-y-10 min-h-[60vh] pb-32" id="services-container">
+                <p class="text-sm text-gray-500 text-center italic mb-4">Cochez les prestations souhaitées :</p>
+                
+                <div id="cat-coiffure" class="space-y-4 pt-4">
+                    <h3 class="text-xl font-serif font-bold text-barber-dark dark:text-white flex items-center gap-3"><i class="fas fa-cut text-barber-gold text-sm"></i> Coiffure Homme</h3>
+                    <div class="space-y-3" id="list-coiffure"></div>
+                </div>
+                <div id="cat-barbe" class="space-y-4 pt-4 border-t border-gray-200 dark:border-white/5">
+                    <h3 class="text-xl font-serif font-bold text-barber-dark dark:text-white flex items-center gap-3"><i class="fas fa-user-astronaut text-barber-gold text-sm"></i> Barbe & Rasage</h3>
+                    <div class="space-y-3" id="list-barbe"></div>
+                </div>
+                 <div id="cat-forfaits" class="space-y-4 pt-4 border-t border-gray-200 dark:border-white/5">
+                    <h3 class="text-xl font-serif font-bold text-barber-dark dark:text-white flex items-center gap-3"><i class="fas fa-crown text-barber-gold text-sm"></i> Formule Tiflow 💈</h3>
+                    <div class="space-y-3" id="list-forfaits"></div>
+                </div>
+                <div id="cat-soins" class="space-y-4 pt-4 border-t border-gray-200 dark:border-white/5">
+                    <h3 class="text-xl font-serif font-bold text-barber-dark dark:text-white flex items-center gap-3"><i class="fas fa-spa text-barber-gold text-sm"></i> Soins</h3>
+                    <div class="space-y-3" id="list-soins"></div>
+                </div>
+            </div>
+
+            <!-- GALERIE -->
+            <div class="py-8 bg-white dark:bg-barber-card/30 border-y border-gray-200 dark:border-white/5">
+                <div class="px-4 mb-4 flex justify-between items-end">
+                    <h3 class="text-xl font-serif font-bold text-barber-dark dark:text-white">Nos Réalisations</h3>
+                    <a href="https://www.instagram.com/tiflow_barber?igsh=MWkzY2swdDQ4amJnNQ==" target="_blank" class="text-xs text-barber-gold font-bold">VOIR INSTAGRAM</a>
+                </div>
+                <div class="flex overflow-x-auto no-scrollbar gap-4 px-4 pb-4">
+                    <img src="Image.jpg" class="h-48 w-36 object-cover rounded-xl border border-gray-200 dark:border-white/10 shadow-lg flex-shrink-0">
+                    <img src="Image (2).jpg" class="h-48 w-36 object-cover rounded-xl border border-gray-200 dark:border-white/10 shadow-lg flex-shrink-0">
+                    <img src="Image (3).jpg" class="h-48 w-36 object-cover rounded-xl border border-gray-200 dark:border-white/10 shadow-lg flex-shrink-0">
+                    <img src="Image (4).jpg" class="h-48 w-36 object-cover rounded-xl border border-gray-200 dark:border-white/10 shadow-lg flex-shrink-0">
+                    <img src="Image (5).jpg" class="h-48 w-36 object-cover rounded-xl border border-gray-200 dark:border-white/10 shadow-lg flex-shrink-0">
+                </div>
+            </div>
+
+            <!-- ART DU GESTE -->
+            <div class="px-4 py-8">
+                <div class="glass p-6 rounded-2xl flex flex-col md:flex-row items-center gap-6 border-l-4 border-barber-gold shadow-md">
+                    <div class="w-full md:w-1/2 relative h-64 rounded-xl overflow-hidden shadow-lg border border-gray-200 dark:border-white/10">
+                        <img src="Image (6).jpg" alt="Maîtrise Technique" class="w-full h-full object-cover">
+                        <div class="absolute inset-0 bg-gradient-to-t from-barber-dark/80 to-transparent flex items-end p-4">
+                            <span class="text-white font-bold text-sm">Maîtrise & Précision</span>
+                        </div>
+                    </div>
+                    <div class="space-y-4 md:w-1/2">
+                        <h3 class="text-xl font-serif font-bold text-barber-dark dark:text-white"><i class="fas fa-cut text-barber-gold mr-2"></i> L'Art du Barbier</h3>
+                        <p class="text-gray-600 dark:text-gray-400 text-sm leading-relaxed">
+                            Chez Tiflow, chaque coupe est une œuvre d'art. Karim et son équipe maîtrisent les techniques traditionnelles pour un résultat impeccable.
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- INFOS -->
+            <div id="infos" class="px-4 py-10 pb-32 space-y-8">
+                <h3 class="text-2xl font-serif font-bold text-barber-dark dark:text-white text-center">Le Salon</h3>
+                <div class="glass p-0 rounded-2xl overflow-hidden shadow-lg border border-gray-200 dark:border-white/5">
+                    <div class="h-40 w-full relative">
+                        <img src="Tiflow.jpg" alt="Ambiance Salon" class="w-full h-full object-cover opacity-90">
+                        <div class="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent"></div>
+                        <div class="absolute bottom-4 left-4 text-white font-bold text-xl drop-shadow-md">Ambiance Élégante & Rétro</div>
+                    </div>
+                    <div class="p-6 text-center space-y-3">
+                        <p class="text-gray-600 dark:text-gray-400 text-sm leading-relaxed">
+                            Plongez dans une atmosphère sophistiquée avec fauteuils en cuir, bois sombre et éclairage tamisé. 
+                            Un concept unique alliant l'art de la barbe et le style parisien.
+                        </p>
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="glass p-6 rounded-2xl shadow-lg border border-gray-200 dark:border-white/5">
+                        <h4 class="text-sm font-bold text-barber-gold uppercase mb-4 tracking-widest"><i class="far fa-clock mr-2"></i> Horaires d'ouverture</h4>
+                        <ul class="space-y-3 text-sm text-gray-700 dark:text-gray-300">
+                            <li class="flex justify-between border-b border-gray-200 dark:border-white/5 pb-1"><span>Lundi</span> <span>10:00 - 19:30</span></li>
+                            <li class="flex justify-between border-b border-gray-200 dark:border-white/5 pb-1"><span>Mardi</span> <span>10:00 - 19:30</span></li>
+                            <li class="flex justify-between border-b border-gray-200 dark:border-white/5 pb-1"><span>Mercredi</span> <span>10:00 - 19:30</span></li>
+                            <li class="flex justify-between border-b border-gray-200 dark:border-white/5 pb-1"><span>Jeudi</span> <span>10:00 - 19:30</span></li>
+                            <li class="flex justify-between border-b border-gray-200 dark:border-white/5 pb-1"><span>Vendredi</span> <span>10:00-13:00 / 14:00-20:00</span></li>
+                            <li class="flex justify-between border-b border-gray-200 dark:border-white/5 pb-1"><span>Samedi</span> <span>10:00 - 19:30</span></li>
+                            <li class="flex justify-between text-gray-400"><span>Dimanche</span> <span class="text-red-500 font-bold">Fermé</span></li>
+                        </ul>
+                    </div>
+                    <div class="space-y-4">
+                        <div class="glass p-1 rounded-2xl h-48 map-container overflow-hidden relative shadow-lg border border-gray-200 dark:border-white/5">
+                            <iframe src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d2624.221573036657!2d2.3375088!3d48.8727096!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x47e66e3c02302e6d%3A0x6299c0d75007020!2s26%20Rue%20de%20Gramont%2C%2075002%20Paris!5e0!3m2!1sfr!2sfr!4v1620000000000!5m2!1sfr!2sfr" width="100%" height="100%" style="border:0;" allowfullscreen="" loading="lazy"></iframe>
+                        </div>
+                        <a href="https://maps.google.com/?q=26+Rue+de+Gramont+75002+Paris" target="_blank" class="block w-full py-3 text-center bg-white border border-gray-200 dark:bg-white/5 dark:border-white/10 rounded-xl text-sm font-bold text-barber-dark dark:text-white hover:bg-gray-100 dark:hover:bg-white/10 transition-colors shadow-md">ITINÉRAIRE</a>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- VUE ADMIN -->
+        <div id="view-admin" class="hidden min-h-screen bg-white dark:bg-barber-dark pb-20">
+            <div class="sticky top-0 bg-white/95 dark:bg-barber-dark/95 backdrop-blur z-20 px-4 py-4 border-b border-gray-200 dark:border-white/10 flex justify-between items-center">
+                <div class="flex items-center gap-3">
+                    <div class="h-8 w-8 bg-barber-gold rounded flex items-center justify-center text-barber-dark font-bold"><i class="fas fa-cut"></i></div>
+                    <h2 class="text-lg font-bold text-barber-dark dark:text-white">Espace Pro</h2>
+                </div>
+                <div class="flex gap-2">
+                    <select id="admin-staff-filter" onchange="renderAdmin()" class="bg-gray-100 dark:bg-white/10 text-barber-dark dark:text-white text-xs rounded border border-gray-300 dark:border-white/20 p-1 outline-none">
+                        <option value="all">Tous</option>
+                        <option value="Karim">Karim</option>
+                        <option value="Momo">Momo</option>
+                        <option value="Adam">Adam</option>
+                    </select>
+                    <button onclick="logout()" class="text-[10px] font-bold text-red-500 border border-red-500 bg-red-500/10 px-3 py-1.5 rounded-full hover:bg-red-500 hover:text-white transition-colors">QUITTER</button>
+                </div>
+            </div>
+            
+            <div class="p-4 space-y-6 max-w-lg mx-auto">
+                <div class="flex gap-2">
+                    <button onclick="openBlockSlotModal()" class="flex-1 bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 p-3 rounded-xl text-xs font-bold text-gray-500 dark:text-gray-300 hover:text-barber-gold hover:border-barber-gold transition-all">
+                        <i class="fas fa-ban text-red-400 mr-2"></i> Bloquer Créneau
+                    </button>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div class="glass p-4 rounded-xl border-l-4 border-barber-gold">
+                        <p class="text-[10px] uppercase text-gray-400 tracking-wider font-bold">CA Journalier</p>
+                        <h3 class="text-2xl font-bold text-barber-dark dark:text-white mt-1" id="admin-ca">0€</h3>
+                    </div>
+                    <div class="glass p-4 rounded-xl border-l-4 border-blue-500">
+                        <p class="text-[10px] uppercase text-gray-400 tracking-wider font-bold">RDV Total</p>
+                        <h3 class="text-2xl font-bold text-barber-dark dark:text-white mt-1" id="admin-count">0</h3>
+                    </div>
+                </div>
+
+                <div class="glass p-3 rounded-xl flex items-center justify-between shadow-sm">
+                    <label class="text-xs text-gray-400 font-bold uppercase"><i class="far fa-calendar-alt mr-2"></i> Planning du :</label>
+                    <input type="date" id="admin-date-picker" onchange="renderAdmin()" class="bg-transparent border-none text-barber-dark dark:text-white font-bold outline-none text-right text-sm">
+                </div>
+
+                <div id="admin-rdv-list" class="space-y-3 pb-20"></div>
+
+                <div class="fixed bottom-4 right-4 left-4 max-w-lg mx-auto">
+                    <button onclick="printZ()" class="w-full bg-white text-barber-dark font-bold p-4 rounded-xl shadow-xl hover:bg-gray-200 transition-all flex items-center justify-center gap-3 border border-gray-200">
+                        <i class="fas fa-receipt"></i> IMPRIMER LE Z DE CAISSE
+                    </button>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- BARRE PANIER -->
+    <div id="cart-bar" class="fixed bottom-0 left-0 w-full p-4 bg-white/95 dark:bg-barber-dark/95 backdrop-blur-xl border-t border-gray-200 dark:border-white/10 z-[100] transform translate-y-full transition-transform duration-300 shadow-lg">
+        <div class="max-w-3xl mx-auto flex items-center justify-between">
+            <div>
+                <p class="text-xs text-gray-500 dark:text-gray-400 uppercase font-bold tracking-wider">Total estimé</p>
+                <div class="flex items-baseline gap-2">
+                    <span id="cart-total" class="text-2xl font-black text-barber-dark dark:text-white">0€</span>
+                    <span id="cart-duration" class="text-xs font-bold text-barber-gold">0 min</span>
+                </div>
+            </div>
+            <button onclick="goToStaffSelection()" class="bg-barber-gold text-barber-dark px-8 py-4 rounded-xl font-bold text-sm shadow-glow hover:bg-white hover:text-barber-dark transition-all flex items-center gap-2 transform active:scale-95">
+                CONTINUER <i class="fas fa-arrow-right"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- MODAL BOOKING -->
+    <div id="booking-modal" class="fixed inset-0 z-[110] bg-white dark:bg-barber-dark hidden flex-col animate-fade-in overflow-y-auto">
+        <div class="sticky top-0 bg-white/95 dark:bg-barber-dark/95 backdrop-blur-xl z-10 px-4 py-4 border-b border-gray-200 dark:border-white/10 flex justify-between items-center">
+            <button onclick="closeBookingModal()" class="h-8 w-8 rounded-full bg-gray-100 dark:bg-white/5 flex items-center justify-center text-barber-dark dark:text-white hover:bg-gray-200 dark:hover:bg-white/10 transition-colors"><i class="fas fa-arrow-left"></i></button>
+            <h3 class="font-bold text-barber-dark dark:text-white text-sm uppercase tracking-wide">Finaliser</h3>
+            <div class="w-8"></div>
+        </div>
+        <div class="p-4 space-y-8 pb-32 max-w-lg mx-auto w-full">
+            <div class="bg-gradient-to-r from-barber-card to-barber-dark p-5 rounded-2xl border border-white/5 flex justify-between items-center shadow-lg relative overflow-hidden">
+                <div class="absolute right-0 top-0 h-full w-1/3 bg-barber-gold/5 skew-x-12"></div>
+                <div class="relative z-10 w-full">
+                    <h4 class="text-xs text-barber-gold uppercase font-bold tracking-wider mb-3">Vos Prestations</h4>
+                    <div id="modal-recap-list" class="space-y-2 mb-4"></div>
+                    <div class="border-t border-white/10 pt-3 flex justify-between items-end">
+                        <span class="text-sm text-gray-400">Total</span>
+                        <span id="modal-total-price" class="text-2xl font-bold text-white">0€</span>
+                    </div>
+                </div>
+            </div>
+            <div>
+                <h4 class="text-xs font-bold text-gray-500 uppercase mb-4 tracking-wider ml-1">L'Équipe Tiflow</h4>
+                <div class="grid grid-cols-3 gap-3" id="staff-selection-grid"></div>
+            </div>
+            <div id="datetime-section" class="hidden opacity-0 transition-opacity duration-500">
+                <h4 class="text-xs font-bold text-gray-500 uppercase mb-4 tracking-wider ml-1">Date & Heure</h4>
+                <div class="date-input-wrapper relative flex items-center justify-between bg-white dark:bg-white/5 p-4 rounded-xl border border-gray-200 dark:border-white/10 mb-4 cursor-pointer group shadow-sm hover:border-barber-gold transition-colors">
+                    <div class="flex items-center gap-3">
+                        <div class="bg-barber-gold/20 p-2 rounded-lg text-barber-gold"><i class="far fa-calendar-alt"></i></div>
+                        <div>
+                            <p class="text-xs text-gray-400">Date sélectionnée</p>
+                            <p id="display-date-text" class="text-barber-dark dark:text-white font-bold capitalize">Aujourd'hui</p>
+                        </div>
+                    </div>
+                    <i class="fas fa-chevron-down text-gray-400 group-hover:text-barber-gold"></i>
+                    <input type="date" id="date-picker" class="absolute inset-0 opacity-0 cursor-pointer" onchange="onDateChange(this.value)">
+                </div>
+                <div class="grid grid-cols-4 gap-2" id="slots-grid"></div>
+            </div>
+            <div id="client-info-section" class="hidden opacity-0 transition-opacity duration-500 space-y-4 pt-4 border-t border-gray-200 dark:border-white/5">
+                <h4 class="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1">Vos coordonnées</h4>
+                <div class="space-y-3">
+                    <input type="text" id="client-name" placeholder="Prénom et Nom" class="w-full bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl py-3.5 px-4 text-barber-dark dark:text-white focus:border-barber-gold outline-none transition-colors">
+                    <input type="tel" id="client-phone" placeholder="06 12 34 56 78" class="w-full bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl py-3.5 px-4 text-barber-dark dark:text-white focus:border-barber-gold outline-none transition-colors">
+                    <input type="email" id="client-email" placeholder="Email (pour confirmation)" class="w-full bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl py-3.5 px-4 text-barber-dark dark:text-white focus:border-barber-gold outline-none transition-colors">
+                </div>
+                <div class="flex items-start gap-3 p-3 bg-barber-gold/5 rounded-xl border border-barber-gold/10">
+                    <input type="checkbox" id="terms" class="mt-1 accent-barber-gold w-4 h-4 rounded cursor-pointer">
+                    <label for="terms" class="text-xs text-gray-500 dark:text-gray-400 leading-relaxed cursor-pointer" id="terms-label"></label>
+                </div>
+            </div>
+        </div>
+        <div class="fixed bottom-0 w-full p-4 bg-white/95 dark:bg-barber-dark/95 backdrop-blur border-t border-gray-200 dark:border-white/10 pb-8 z-20">
+            <div class="max-w-lg mx-auto">
+                <button onclick="confirmBooking()" id="btn-final-book" class="w-full bg-gradient-to-r from-barber-gold to-yellow-600 text-barber-dark font-bold text-base py-4 rounded-xl shadow-glow opacity-50 cursor-not-allowed flex justify-center items-center gap-2 transition-all transform active:scale-95" disabled>
+                    <span>CONFIRMER LA RÉSERVATION</span> <i class="fas fa-check-circle"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODALS ADMIN & UTILS -->
+    <div id="modal-payment" class="fixed inset-0 z-[120] bg-black/90 backdrop-blur-md hidden flex items-center justify-center p-6 animate-fade-in">
+        <div class="glass w-full max-w-xs p-6 rounded-2xl text-center border-t-4 border-green-500">
+            <h3 class="text-lg font-bold text-barber-dark dark:text-white mb-2">Encaissement</h3>
+            <p class="text-sm text-gray-400 mb-6">Montant à régler : <span id="pay-amount" class="text-barber-dark dark:text-white font-bold"></span>€</p>
+            <div class="grid grid-cols-2 gap-3">
+                <button onclick="confirmPayment('Espèces')" class="bg-green-600 text-white p-4 rounded-xl font-bold shadow-lg hover:scale-105 transition-transform">Espèces</button>
+                <button onclick="confirmPayment('CB')" class="bg-blue-600 text-white p-4 rounded-xl font-bold shadow-lg hover:scale-105 transition-transform">CB</button>
+            </div>
+            <button onclick="document.getElementById('modal-payment').classList.add('hidden')" class="mt-6 text-xs text-gray-500 underline">Annuler</button>
+        </div>
+    </div>
+
+    <div id="modal-transfer" class="fixed inset-0 z-[120] bg-black/90 backdrop-blur-md hidden flex items-center justify-center p-6 animate-fade-in">
+        <div class="glass w-full max-w-xs p-6 rounded-2xl text-center border-t-4 border-blue-500">
+            <h3 class="text-lg font-bold text-barber-dark dark:text-white mb-4">Transférer le RDV</h3>
+            <p class="text-xs text-gray-400 mb-4">Choisir le nouveau coiffeur :</p>
+            <div class="space-y-2" id="transfer-options"></div>
+            <button onclick="document.getElementById('modal-transfer').classList.add('hidden')" class="mt-4 text-xs text-gray-500 underline">Annuler</button>
+        </div>
+    </div>
+
+    <div id="modal-block" class="fixed inset-0 z-[120] bg-black/90 backdrop-blur-md hidden flex items-center justify-center p-6 animate-fade-in">
+        <div class="glass w-full max-w-xs p-6 rounded-2xl text-center border-t-4 border-red-500">
+            <h3 class="text-lg font-bold text-barber-dark dark:text-white mb-4">Bloquer Créneau</h3>
+            <label class="block text-left text-xs text-gray-400 mb-1">Pour qui ?</label>
+            <select id="block-staff" class="w-full bg-white dark:bg-white/10 border border-gray-200 dark:border-white/20 rounded p-2 text-barber-dark dark:text-white mb-4 outline-none">
+                <!-- Rempli par JS -->
+            </select>
+            <label class="block text-left text-xs text-gray-400 mb-1">Quelle heure ?</label>
+            <select id="block-time" class="w-full bg-white dark:bg-white/10 border border-gray-200 dark:border-white/20 rounded p-2 text-barber-dark dark:text-white mb-6 outline-none">
+                <!-- Rempli par JS -->
+            </select>
+            <button onclick="confirmBlockSlot()" class="w-full bg-red-600 text-white font-bold py-3 rounded-xl hover:bg-red-500 transition-colors shadow-lg">BLOQUER</button>
+            <button onclick="document.getElementById('modal-block').classList.add('hidden')" class="mt-4 text-xs text-gray-500 underline">Annuler</button>
+        </div>
+    </div>
+
+    <div id="modal-login" class="fixed inset-0 z-[120] bg-black/90 backdrop-blur-md hidden flex items-center justify-center p-6 animate-fade-in">
+        <div class="glass w-full max-w-xs p-8 rounded-2xl text-center border-t-4 border-barber-gold shadow-2xl relative">
+            <button onclick="toggleAdminPanel()" class="absolute top-4 right-4 text-gray-500 hover:text-white"><i class="fas fa-times"></i></button>
+            <h3 class="text-lg font-bold text-barber-dark dark:text-white mb-4">Accès Coiffeur</h3>
+            <input type="password" id="admin-pass" class="w-full bg-white dark:bg-barber-dark border border-gray-200 dark:border-white/10 rounded-xl p-3 text-center text-barber-dark dark:text-white text-lg tracking-[0.5em] focus:border-barber-gold outline-none mb-4 placeholder-gray-500" placeholder="••••">
+            <button onclick="login()" class="w-full bg-barber-gold text-barber-dark font-bold py-3 rounded-xl hover:bg-white transition-colors shadow-lg">ENTRER</button>
+        </div>
+    </div>
+
+    <!-- TICKET DE CAISSE THERMIQUE (Z) -->
+    <div id="receipt-print-area" class="hidden">
+        <div class="ticket-header">
+            <h2 class="ticket-title">TIFLOW BARBER</h2>
+            <p class="ticket-subtitle">26 Rue de Gramont, 75002 Paris</p>
+            <p class="ticket-subtitle">Z DE CAISSE</p>
+        </div>
+        <p class="ticket-subtitle" style="text-align:left; border-bottom:1px dashed #000; padding-bottom:5px;">Date: <span id="z-date"></span></p>
+        
+        <table style="width:100%; margin:10px 0;">
+            <thead><tr style="text-align:left;"><th>H</th><th>Presta</th><th style="text-align:right;">€</th></tr></thead>
+            <tbody id="z-body"></tbody>
+        </table>
+        
+        <div class="ticket-divider"></div>
+        <div class="ticket-row"><span>Espèces:</span><span id="z-esp">0€</span></div>
+        <div class="ticket-row"><span>Carte Bancaire:</span><span id="z-cb">0€</span></div>
+        <div class="ticket-total-row">
+            <div style="display:flex; justify-content:space-between;"><span>TOTAL:</span><span id="z-total">0€</span></div>
+        </div>
+        <div class="ticket-footer">-- Fin de journée --</div>
+    </div>
+
+    <!-- ECRAN SUCCES -->
+    <div id="success-screen" class="fixed inset-0 z-[130] bg-barber-dark hidden flex-col items-center justify-center p-6 text-center animate-fade-in">
+        <div class="relative mb-8">
+            <div class="absolute inset-0 bg-green-500/20 blur-xl rounded-full"></div>
+            <div class="relative w-24 h-24 bg-gradient-to-br from-green-500 to-green-700 rounded-full flex items-center justify-center shadow-2xl ring-4 ring-green-900/50">
+                <i class="fas fa-check text-4xl text-white"></i>
+            </div>
+        </div>
+        
+        <h2 class="text-3xl font-serif font-bold text-white mb-2">Réservation Confirmée !</h2>
+        <p class="text-gray-400 mb-8 max-w-xs mx-auto">Votre créneau a été bloqué avec succès. À très vite au salon.</p>
+        
+        <!-- Récapitulatif -->
+        <div class="bg-white/5 p-6 rounded-xl w-full max-w-sm mb-8 border border-white/5 text-left space-y-3">
+            <div class="flex justify-between items-center border-b border-white/10 pb-2">
+                <span class="text-gray-400 text-xs uppercase font-bold">Client</span>
+                <span class="text-white font-bold" id="success-client-name">--</span>
+            </div>
+            <div class="flex justify-between items-center border-b border-white/10 pb-2">
+                <span class="text-gray-400 text-xs uppercase font-bold">Date & Heure</span>
+                <span class="text-white font-bold" id="success-date-time">--</span>
+            </div>
+             <div class="flex justify-between items-center border-b border-white/10 pb-2">
+                <span class="text-gray-400 text-xs uppercase font-bold">Coiffeur</span>
+                <span class="text-white font-bold text-barber-gold" id="success-staff">--</span>
+            </div>
+            <div class="flex items-center gap-3 pt-2 text-green-400 text-sm">
+                <i class="fas fa-envelope"></i>
+                <span>Email de confirmation envoyé.</span>
+            </div>
+        </div>
+        
+        <button onclick="location.reload()" class="text-barber-gold font-bold text-sm border-b-2 border-barber-gold pb-1 hover:text-white hover:border-white transition-all">Retour à l'accueil</button>
+    </div>
+
+    <script>
+        const CONFIG = {
+            adminPassword: "TI FLO", 
+            legalNotice: "J'accepte que ce rendez-vous ne soit <strong>pas annulable</strong> en ligne. En cas d'empêchement, j'appellerai le salon.",
+            emailjsServiceId: "service_6j0cphx",
+            emailjsTemplateId: "template_lfhi6tf", 
+            emailjsCancellationTemplateId: "template_tms0rsg",
+            emailjsPublicKey: "g5uCkZHhfkx7Va86a"
+        };
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyBBWJVsapI1hByRFFyeORgtGWFRButXfzY",
+            authDomain: "tiflow-barber-app.firebaseapp.com",
+            projectId: "tiflow-barber-app",
+            storageBucket: "tiflow-barber-app.firebasestorage.app",
+            messagingSenderId: "108498133046",
+            appId: "1:108498133046:web:83d7be800e3090635bf897"
+        };
+
+        const staff = [
+            { id: 1, name: "Karim", color: "bg-blue-600" },
+            { id: 2, name: "Momo", color: "bg-emerald-600" },
+            { id: 3, name: "Adam", color: "bg-amber-600" }
+        ];
+
+        const services = {
+            coiffure: [
+                { id: 101, name: "Coupe coiffure", price: 22, duration: 30, desc: "Ciseaux ou tondeuse + coiffage" },
+                { id: 102, name: "Rasage du crâne traditionnel", price: 20, duration: 20, desc: "Blaireau, serviette chaude" }
+            ],
+            barbe: [
+                { id: 201, name: "Taille de Barbe + rasage", price: 15, duration: 15, desc: "Serviette chaude, traçage" }
+            ],
+            forfaits: [
+                { id: 301, name: "Formule Tiflow 💈", price: 35, duration: 45, desc: "Coupe cheveux + barbe complète" }
+            ],
+            soins: [
+                { id: 401, name: "Épilations à la cire", price: 12, duration: 15, desc: "Nez / Oreilles" }
+            ]
+        };
+
+        const slots = ["10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00", "17:00", "18:00", "19:00"];
+
+        let db;
+        try {
+            firebase.initializeApp(firebaseConfig);
+            db = firebase.firestore();
+            firebase.auth().signInAnonymously();
+            emailjs.init(CONFIG.emailjsPublicKey);
+            console.log("🔥 Services OK");
+        } catch(e) { console.error("Init Error", e); }
+
+        let booking = { services: [], staff: null, date: new Date().toISOString().split('T')[0], time: null };
+        let currentPayId = null; 
+        let currentTransferId = null;
+
+        // --- DATA MANAGER ---
+        async function getAppointmentsQuery(date) {
+             let results = [];
+             try { if(db) { const snap = await db.collection('appointments').where('date', '==', date).get(); results = snap.docs.map(d => ({id: d.id, ...d.data()})); } } catch(e) {}
+             const localData = JSON.parse(localStorage.getItem('tiflow_appointments') || '[]');
+             return [...results, ...localData.filter(a => a.date === date)];
+        }
+
+        async function saveAppointment(data) {
+            try { if(db) { await db.collection('appointments').add(data); return true; } } catch(e) {}
+            const localData = JSON.parse(localStorage.getItem('tiflow_appointments') || '[]');
+            localData.push({ ...data, id: 'local_' + Date.now() });
+            localStorage.setItem('tiflow_appointments', JSON.stringify(localData));
+            return true;
+        }
+
+        // --- UI ---
+        function init() {
+            renderServicesList();
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('date-picker').min = today;
+            document.getElementById('date-picker').value = today;
+            document.getElementById('admin-date-picker').value = today;
+            booking.date = today;
+            document.getElementById('terms-label').innerHTML = CONFIG.legalNotice;
+            updateDateDisplay();
+        }
+
+        // 1. SERVICES
+        function renderServicesList() {
+            const generateHTML = (list) => list.map(s => `
+                <label class="block relative cursor-pointer group mb-3">
+                    <input type="checkbox" name="service_select" class="peer sr-only service-checkbox" onchange="toggleService(${s.id}, '${s.name}', ${s.price}, '${s.duration}', this)">
+                    <div class="glass p-4 rounded-xl border border-gray-200 dark:border-white/5 transition-all flex justify-between items-center active:scale-[0.98] shadow-sm hover:shadow-md">
+                        <div class="flex-1"><h4 class="font-bold text-barber-dark dark:text-white text-base">${s.name}</h4><p class="text-xs text-gray-500 dark:text-gray-400 mt-1">${s.desc}</p><p class="text-xs text-barber-gold mt-2 font-medium"><i class="far fa-clock"></i> ${s.duration} min</p></div>
+                        <div class="text-right flex flex-col items-end"><span class="block text-lg font-bold text-barber-dark dark:text-white">${s.price}€</span><div class="check-icon h-6 w-6 rounded-full bg-barber-gold text-barber-dark flex items-center justify-center text-xs opacity-0 scale-50 transition-all duration-300 mt-2"><i class="fas fa-check"></i></div></div>
+                    </div>
+                </label>`).join('');
+            document.getElementById('list-coiffure').innerHTML = generateHTML(services.coiffure);
+            document.getElementById('list-barbe').innerHTML = generateHTML(services.barbe);
+            document.getElementById('list-forfaits').innerHTML = generateHTML(services.forfaits);
+            document.getElementById('list-soins').innerHTML = generateHTML(services.soins);
+        }
+
+        function toggleService(id, name, price, duration, el) {
+            const index = booking.services.findIndex(s => s.id === id);
+            const cardDiv = el.parentElement.querySelector('div');
+            
+            if (index > -1) {
+                booking.services.splice(index, 1);
+                cardDiv.classList.remove('selected-service');
+            } else {
+                booking.services.push({ id, name, price, duration });
+                cardDiv.classList.add('selected-service');
+            }
+            updateCartBar();
+        }
+
+        function updateCartBar() {
+            const cartBar = document.getElementById('cart-bar');
+            if (booking.services.length > 0) {
+                cartBar.classList.remove('translate-y-full');
+                let total = booking.services.reduce((sum, s) => sum + s.price, 0);
+                let duration = booking.services.reduce((sum, s) => sum + parseInt(s.duration), 0);
+                document.getElementById('cart-total').innerText = total + "€";
+                document.getElementById('cart-duration').innerText = duration + " min";
+            } else { cartBar.classList.add('translate-y-full'); }
+        }
+
+        function goToStaffSelection() {
+            document.getElementById('booking-modal').classList.remove('hidden');
+            document.getElementById('booking-modal').classList.add('flex');
+            
+            const list = document.getElementById('modal-recap-list');
+            let total = 0;
+            list.innerHTML = booking.services.map(s => { total += s.price; return `<div class="flex justify-between text-sm text-gray-500 dark:text-gray-300 border-b border-gray-200 dark:border-white/5 pb-1"><span>${s.name}</span><span>${s.price}€</span></div>` }).join('');
+            document.getElementById('modal-total-price').innerText = total + "€";
+
+            renderStaffSelection();
+        }
+
+        function closeBookingModal() {
+            document.getElementById('booking-modal').classList.add('hidden');
+            document.getElementById('booking-modal').classList.remove('flex');
+            document.getElementById('datetime-section').classList.add('hidden');
+            document.getElementById('client-info-section').classList.add('hidden');
+            booking.staff = null; booking.time = null;
+            document.getElementById('btn-final-book').disabled = true;
+            document.getElementById('btn-final-book').classList.add('opacity-50');
+        }
+
+        // 2. STAFF
+        function renderStaffSelection() {
+            const grid = document.getElementById('staff-selection-grid');
+            grid.innerHTML = staff.map(s => `
+                <div onclick="selectStaff(${s.id}, this)" class="staff-card border border-gray-200 dark:border-white/10 rounded-xl p-3 text-center cursor-pointer hover:bg-gray-100 dark:hover:bg-white/5 transition-all bg-white dark:bg-white/5 shadow-sm">
+                    <div class="w-16 h-16 rounded-full mx-auto mb-2 flex items-center justify-center text-xl font-bold text-white ${s.color} border-2 border-transparent shadow-lg transition-all duration-300">${s.name.charAt(0)}</div>
+                    <p class="text-sm font-bold text-barber-dark dark:text-white">${s.name}</p>
+                </div>`).join('');
+        }
+
+        function selectStaff(id, el) {
+            booking.staff = staff.find(s => s.id === id);
+            document.querySelectorAll('.staff-card').forEach(c => { c.classList.remove('selected-item'); c.querySelector('div').classList.remove('border-barber-gold', 'scale-110'); });
+            el.classList.add('selected-item'); el.querySelector('div').classList.add('border-barber-gold', 'scale-110');
+            const dateSec = document.getElementById('datetime-section');
+            dateSec.classList.remove('hidden');
+            setTimeout(() => dateSec.classList.remove('opacity-0'), 50);
+            renderSlots();
+        }
+
+        // 3. SLOTS
+        function onDateChange(newDate) { booking.date = newDate; updateDateDisplay(); renderSlots(); }
+
+        function updateDateDisplay() {
+            const dateObj = new Date(booking.date);
+            const options = { weekday: 'long', day: 'numeric', month: 'long' };
+            document.getElementById('display-date-text').innerText = dateObj.toLocaleDateString('fr-FR', options);
+        }
+
+        async function renderSlots() {
+            const grid = document.getElementById('slots-grid');
+            grid.innerHTML = '<div class="col-span-4 text-center text-xs text-gray-500 py-4"><i class="fas fa-circle-notch fa-spin"></i> Dispos...</div>';
+            let taken = await getAppointmentsQuery(booking.date);
+            const now = new Date();
+            const todayStr = now.toISOString().split('T')[0];
+            const currentHour = now.getHours();
+
+            grid.innerHTML = slots.map(time => {
+                const slotHour = parseInt(time.split(':')[0]);
+                let isPast = (booking.date === todayStr && slotHour <= currentHour);
+                let isTaken = taken.some(t => t.time === time && t.staff.id === booking.staff.id && t.type !== 'blocked');
+                let isBlocked = taken.some(t => t.time === time && t.type === 'blocked' && t.staff.id === booking.staff.id);
+
+                if (isPast || isTaken || isBlocked) {
+                    return `<div class="p-3 rounded-lg bg-gray-200 dark:bg-white/5 text-gray-400 dark:text-gray-600 text-xs font-bold text-center opacity-30 line-through cursor-not-allowed">${time}</div>`;
+                } else {
+                    return `<div onclick="selectTime('${time}', this)" class="slot-card p-3 rounded-lg bg-white dark:bg-white/10 border border-gray-200 dark:border-white/5 text-center text-xs font-bold cursor-pointer text-barber-dark dark:text-white hover:bg-barber-gold hover:text-barber-dark transition-all shadow-sm">${time}</div>`;
+                }
+            }).join('');
+        }
+
+        function selectTime(time, el) {
+            booking.time = time;
+            document.querySelectorAll('.slot-card').forEach(e => e.classList.remove('selected-item', 'bg-barber-gold', 'text-barber-dark'));
+            el.classList.add('selected-item', 'bg-barber-gold', 'text-barber-dark');
+            const formSec = document.getElementById('client-info-section');
+            formSec.classList.remove('hidden');
+            setTimeout(() => formSec.classList.remove('opacity-0'), 50);
+            formSec.scrollIntoView({ behavior: 'smooth' });
+            validateForm(); 
+        }
+
+        document.getElementById('client-name').addEventListener('input', validateForm);
+        document.getElementById('client-phone').addEventListener('input', validateForm);
+        document.getElementById('terms').addEventListener('change', validateForm);
+
+        function validateForm() {
+            const name = document.getElementById('client-name').value;
+            const phone = document.getElementById('client-phone').value;
+            const terms = document.getElementById('terms').checked;
+            const btn = document.getElementById('btn-final-book');
+            if(name && phone && terms && booking.time) { btn.disabled = false; btn.classList.remove('opacity-50', 'cursor-not-allowed'); } 
+            else { btn.disabled = true; btn.classList.add('opacity-50', 'cursor-not-allowed'); }
+        }
+
+        async function confirmBooking() {
+            const btn = document.getElementById('btn-final-book');
+            const originalText = btn.innerHTML;
+            btn.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> Traitement...';
+            
+            const client = {
+                name: document.getElementById('client-name').value,
+                phone: document.getElementById('client-phone').value,
+                email: document.getElementById('client-email').value
+            };
+
+            const data = {
+                ...booking,
+                service: { name: booking.services.map(s => s.name).join(' + '), price: booking.services.reduce((a,b)=>a+b.price,0) },
+                client: client,
+                paid: false,
+                type: 'appointment',
+                createdAt: new Date().toISOString()
+            };
+
+            const success = await saveAppointment(data);
+            if(success) {
+                if(client.email) {
+                    emailjs.send(CONFIG.emailjsServiceId, CONFIG.emailjsTemplateId, {
+                        to_email: client.email, to_name: client.name, date: booking.date, time: booking.time, service: data.service.name, staff: booking.staff.name
+                    });
+                }
+                
+                // UPDATE SUCCESS SCREEN INFO
+                document.getElementById('success-client-name').innerText = client.name;
+                document.getElementById('success-date-time').innerText = booking.date + " à " + booking.time;
+                document.getElementById('success-staff').innerText = booking.staff.name;
+
+                document.getElementById('booking-modal').classList.add('hidden');
+                document.getElementById('success-screen').classList.remove('hidden');
+                document.getElementById('success-screen').classList.add('flex');
+            } else { alert("Erreur Inconnue"); btn.innerHTML = originalText; }
+        }
+
+        // --- ADMIN & LOGIC PRO ---
+
+        function toggleAdminPanel() { document.getElementById('modal-login').classList.toggle('hidden'); }
+        function login() {
+            if(document.getElementById('admin-pass').value === CONFIG.adminPassword) {
+                document.getElementById('modal-login').classList.add('hidden');
+                document.getElementById('view-client').classList.add('hidden');
+                document.getElementById('view-admin').classList.remove('hidden');
+                renderAdmin();
+            } else { alert("Code erroné"); }
+        }
+        function logout() { location.reload(); }
+
+        // FILTRE & RENDER
+        async function renderAdmin() {
+            const dateFilter = document.getElementById('admin-date-picker').value || new Date().toISOString().split('T')[0];
+            document.getElementById('admin-date-picker').value = dateFilter;
+            const staffFilter = document.getElementById('admin-staff-filter').value;
+            const list = document.getElementById('admin-rdv-list');
+            list.innerHTML = '<p class="text-center text-xs text-gray-500 py-10">Chargement...</p>';
+            
+            let rdvs = await getAppointmentsQuery(dateFilter);
+            rdvs.sort((a,b) => a.time.localeCompare(b.time));
+
+            if(staffFilter !== 'all') {
+                rdvs = rdvs.filter(r => r.staff.name === staffFilter);
+            }
+
+            list.innerHTML = rdvs.map(r => {
+                if(r.type === 'blocked') {
+                    return `<div class="glass p-3 rounded-xl flex justify-between items-center border-l-4 border-gray-500 bg-gray-800/50 opacity-70"><div class="flex items-center gap-4"><span class="font-serif font-bold text-xl text-gray-400">${r.time}</span><p class="text-xs text-gray-400 font-bold">⛔ INDISPONIBLE (${r.staff.name})</p></div><button onclick="cancelRDV('${r.id}', '', '')" class="text-xs text-red-400 hover:text-white"><i class="fas fa-trash"></i></button></div>`;
+                }
+
+                const contactInfo = `<div class="mt-2 text-[10px] text-gray-500 flex gap-3">${r.client.phone ? `<a href="tel:${r.client.phone}" class="hover:text-barber-gold"><i class="fas fa-phone"></i> ${r.client.phone}</a>` : ''} ${r.client.email ? `<a href="mailto:${r.client.email}" class="hover:text-barber-gold"><i class="fas fa-envelope"></i> Email</a>` : ''}</div>`;
+
+                return `
+                <div class="glass p-4 rounded-xl flex justify-between items-start border-l-4 ${r.paid ? 'border-green-500' : 'border-barber-gold'} shadow-sm">
+                    <div class="flex items-start gap-4">
+                        <span class="font-serif font-bold text-xl text-barber-dark dark:text-white pt-1">${r.time}</span>
+                        <div>
+                            <p class="font-bold text-sm text-barber-dark dark:text-white">${r.client.name} <span class="text-gray-500 text-xs">(${r.staff.name})</span></p>
+                            <p class="text-xs text-gray-400">${r.service.name}</p>
+                            ${contactInfo}
+                        </div>
+                    </div>
+                    <div class="flex flex-col items-end gap-2">
+                        <span class="text-lg font-bold text-barber-gold">${r.service.price}€</span>
+                        ${r.paid 
+                            ? `<span class="text-[9px] uppercase font-bold text-green-500 border border-green-500/30 px-2 py-1 rounded">Payé (${r.paymentMethod})</span>` 
+                            : `<button onclick="openPaymentModal('${r.id}', ${r.service.price})" class="text-[10px] bg-barber-gold text-barber-dark px-3 py-1.5 rounded font-bold hover:bg-white transition-colors">Encaisser</button>`
+                        }
+                        <div class="flex gap-2 mt-1">
+                            <button onclick="openTransferModal('${r.id}')" class="text-blue-400 hover:text-barber-dark dark:hover:text-white text-xs" title="Transférer"><i class="fas fa-exchange-alt"></i></button>
+                            <button onclick="cancelRDV('${r.id}', '${r.client.email}', '${r.client.name}')" class="text-red-400 hover:text-barber-dark dark:hover:text-white text-xs" title="Annuler & Prévenir"><i class="fas fa-times"></i></button>
+                        </div>
+                    </div>
+                </div>`;
+            }).join('');
+            
+            let total = 0;
+            rdvs.forEach(r => { if(r.paid && r.type !== 'blocked') total += r.service.price });
+            document.getElementById('admin-ca').innerText = total + "€";
+            document.getElementById('admin-count').innerText = rdvs.filter(r => r.type !== 'blocked').length;
+            
+            if(rdvs.length === 0) list.innerHTML = '<div class="text-center py-12"><p class="text-sm text-gray-500">Aucun RDV pour le moment.</p></div>';
+        }
+
+        // --- PAIEMENT ---
+        function openPaymentModal(id, price) { currentPayId = id; document.getElementById('pay-amount').innerText = price; document.getElementById('modal-payment').classList.remove('hidden'); document.getElementById('modal-payment').classList.add('flex'); }
+        function closePaymentModal() { document.getElementById('modal-payment').classList.add('hidden'); document.getElementById('modal-payment').classList.remove('flex'); }
+        async function confirmPayment(method) {
+            if(currentPayId) {
+                if(currentPayId.startsWith('local_')) {
+                    const localData = JSON.parse(localStorage.getItem('tiflow_appointments') || '[]');
+                    const idx = localData.findIndex(a => a.id === currentPayId);
+                    if(idx !== -1) { localData[idx].paid = true; localData[idx].paymentMethod = method; localStorage.setItem('tiflow_appointments', JSON.stringify(localData)); }
+                } else {
+                    try { await db.collection('appointments').doc(currentPayId).update({paid: true, paymentMethod: method}); } catch(e){}
+                }
+                closePaymentModal();
+                renderAdmin();
+            }
+        }
+
+        // --- BLOCK SLOT ---
+        function openBlockSlotModal() {
+            const staffSelect = document.getElementById('block-staff');
+            staffSelect.innerHTML = staff.map(s => `<option value="${s.name}">${s.name}</option>`).join('');
+            const timeSelect = document.getElementById('block-time');
+            timeSelect.innerHTML = slots.map(t => `<option value="${t}">${t}</option>`).join('');
+
+            const currentFilter = document.getElementById('admin-staff-filter').value;
+            if(currentFilter !== 'all') staffSelect.value = currentFilter;
+
+            document.getElementById('modal-block').classList.remove('hidden');
+            document.getElementById('modal-block').classList.add('flex');
+        }
+
+        async function confirmBlockSlot() {
+            const barberName = document.getElementById('block-staff').value;
+            const time = document.getElementById('block-time').value;
+            const date = document.getElementById('admin-date-picker').value;
+            const barber = staff.find(s => s.name === barberName);
+
+            const data = {
+                type: 'blocked',
+                date: date,
+                time: time,
+                staff: barber,
+                client: { name: "BLOQUÉ", phone: "" },
+                service: { name: "Indisponibilité", price: 0 },
+                paid: false
+            };
+            
+            await saveAppointment(data);
+            document.getElementById('modal-block').classList.add('hidden');
+            renderAdmin();
+        }
+
+        // --- TRANSFERT ---
+        function openTransferModal(id) {
+            currentTransferId = id;
+            const container = document.getElementById('transfer-options');
+            container.innerHTML = staff.map(s => `<button onclick="confirmTransfer(${s.id}, '${s.name}')" class="w-full p-3 bg-white/10 rounded mb-2 hover:bg-barber-gold hover:text-barber-dark font-bold text-sm bg-gray-100 dark:bg-white/10 text-gray-800 dark:text-white">${s.name}</button>`).join('');
+            document.getElementById('modal-transfer').classList.remove('hidden');
+            document.getElementById('modal-transfer').classList.add('flex');
+        }
+
+        async function confirmTransfer(newStaffId, newStaffName) {
+            if(currentTransferId) {
+                if(currentTransferId.startsWith('local_')) {
+                     const localData = JSON.parse(localStorage.getItem('tiflow_appointments') || '[]');
+                     const idx = localData.findIndex(a => a.id === currentTransferId);
+                     if(idx !== -1) { 
+                         localData[idx].staff = { id: newStaffId, name: newStaffName };
+                         localStorage.setItem('tiflow_appointments', JSON.stringify(localData));
+                     }
+                } else {
+                    try { await db.collection('appointments').doc(currentTransferId).update({ staff: { id: newStaffId, name: newStaffName } }); } catch(e){}
+                }
+                document.getElementById('modal-transfer').classList.add('hidden');
+                renderAdmin();
+            }
+        }
+
+        // --- ANNULATION AVEC MAIL ---
+        async function cancelRDV(id, email, name) {
+            if(confirm("Annuler le RDV et envoyer un mail d'annulation ?")) {
+                if(email) { emailjs.send(CONFIG.emailjsServiceId, CONFIG.emailjsCancellationTemplateId, { to_email: email, to_name: name }); }
+                
+                if(id.startsWith('local_')) {
+                    const localData = JSON.parse(localStorage.getItem('tiflow_appointments') || '[]');
+                    const newData = localData.filter(a => a.id !== id);
+                    localStorage.setItem('tiflow_appointments', JSON.stringify(newData));
+                } else { try { await db.collection('appointments').doc(id).delete(); } catch(e){} }
+                renderAdmin();
+            }
+        }
+
+        async function printZ() {
+            const date = document.getElementById('admin-date-picker').value;
+            const rdvs = await getAppointmentsQuery(date);
+            const paid = rdvs.filter(r => r.paid && r.type !== 'blocked');
+            let total = 0, cb = 0, esp = 0;
+            let rows = '';
+            paid.forEach(r => {
+                total += r.service.price;
+                if(r.paymentMethod === 'CB') cb += r.service.price; else esp += r.service.price;
+                rows += `<tr><td>${r.time}</td><td>${r.service.name} <small>(${r.staff.name.charAt(0)})</small></td><td style="text-align:right">${r.service.price}€</td></tr>`;
+            });
+            document.getElementById('z-date').innerText = date;
+            document.getElementById('z-body').innerHTML = rows;
+            document.getElementById('z-esp').innerText = esp + '€';
+            document.getElementById('z-cb').innerText = cb + '€';
+            document.getElementById('z-total').innerText = total + '€';
+            window.print();
+        }
+
+        function toggleTheme() { document.documentElement.classList.toggle('dark'); document.documentElement.classList.toggle('light-mode'); }
+        function scrollToCategory(cat) { const el = document.getElementById('cat-' + cat); const y = el.getBoundingClientRect().top + window.pageYOffset - 120; window.scrollTo({top: y, behavior: 'smooth'}); }
+        
+        init();
+    </script>
+</body>
+</html>
